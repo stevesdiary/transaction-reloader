@@ -16,14 +16,7 @@ app.use(express.urlencoded({ extended: true }))
 app.use(express.static('public'));
 app.use(cors());
 
-let upload = multer({ 
-   destination: (req, file, cb) => {
-      cb(null, __basedir + "/uploads/")},
-      filename: (req, file, cb) => {
-      console.log(file.originalname);
-      cb(null, `${Date.now()}-bezkoder-${file.originalname}`);
-      },
-   });
+
 let connection = mysql.createConnection({
    host: process.env.DB_HOST,
    user: process.env.USERNAME,
@@ -36,69 +29,73 @@ connection.connect((err)=>{
    if (err) throw err;
    console.log('Connected to MYSQL server!')
 });
+const storage = multer.diskStorage({
+   destination: function (req, file, cb) {
+      cb(null, './uploads');
+   },
+   filename: function (req, file, cb) {
+      cb(null, Date.now() + path.extname(file.originalname));
+   }
+});
+const multerFilter = (req, file, cb) => {
+   if (file.mimetype === 'text/csv') {
+      cb(null, true);
+   }else{
+      cb(new Error('Invalid file type! Upload csv file.'), false);
+   }
+}
+const upload = multer({
+   storage: storage,
+   limits: {filesize: 10000000},
+   filefilter: multerFilter
+})
 
-app.post('/data', upload.single('file'), (req, res) => {
-   const filename = req.file;
-   var storage = multer.diskStorage({
-      destination: (req, file, cb) => {
-         cb(null, '/uploads')
-      },
-      filename: (req, file, cb) => {
-         cb(null, file.fieldname + '-' + Date.now())
-         console.log(file, storage)
-      }
-      
-   });
-   console.log("File "  + filename + " uploaded successfully!");
-   res.send('File uploaded successfully');
+
+app.post('/upload',  upload.single('file'), async (req, res) => {
+   try{
+      const upload = multer({ dest: 'uploads/' });
+   // console.log({file: req.file})
+
+   // res.status(200).send({
+   //    statuscode: 200,
+   //    message: 'File uploaded successfully',
+   // })
+   }catch(err){
+      console.log(err)
+      res.status(404).json({error: err.message})
+   }
+
+   // const csvk= fs.readFileSync('./uploads/'+req.file.filename, 'utf-8')
+   // let array = (await csvk.writeToString()).split("\r")
+
+   // let result = []
+
+   // let headers = array[0].split(",")
+
+   // for(let i = 1; i < array.length-1; i++){
+   //    let obj = {}
+   //    let str = array[i].split(",")
+   //    let s = ''
+   // }
    
+   
+   let json = csvToJson.getJsonFromCsv('./uploads/'+req.file.filename);
+   for(let i=0; i<json.length;i++){
+      // console.log("JSON FILE: " , json[i]);
+   }
+   const strJ =(JSON.stringify(json));
+   // console.log(strJ);
+   const query = await connection.query("INSERT INTO `json` (id, rawData, status) VALUES (1, '"+ strJ +"', FALSE)", (err,result) => {
+      if(err) {
+         res.status(404).send(err);
+      }
+      else {
+         // console.log(query)
+         res.send(result != null ? 'Success' : 'fail')
+      }
+      });
 
 });
-
-
-app.post('/post', (req, res) => {
-   const file = req.body.file;
-   console.log(file);
-   fs.createReadStream()
-
-   const upload = async (req, res) => {
-      try{
-         if (req.file == undefined) {
-            return res.status(400).send("Please select a CSV file");
-         }
-            //convert csv to json
-         
-            CSVToJSON().fromFile(file).then((json) => {
-            //fileJ is an array of json objects
-            console.log(json);
-            const newRecord = Record.create({
-               accountType: "SAVINGS",
-               acquiringInstCode: "200018",
-               amount: 15,
-               authCode: "",
-               cardExpiry: "2502",
-               cardHolder: "AK/SAMSON",
-               cardLabel: "Master card",
-               maskedPan: "524910xxxxxx7932",
-               merchantId: "2057LA200003890",
-               originalForwardingInstCode: "627629",
-               responseCode: "00",
-               rrn: "2211052015920",
-               terminalId: "6476868",
-               transactionType: "PURCHASE",
-               transmissionDateTime: "2022-11-05 09:15:28",
-               responseMessage: "APPROVED"
-            })
-
-         }).catch(err => {
-            console.log(err);
-         })
-      }catch(err){
-         console.log(err);
-      }
-      upload();
-   }
-})
 
 app.listen(3000, function(){
    console.log('Server listening on port 3000')
