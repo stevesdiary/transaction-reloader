@@ -6,8 +6,6 @@ const env = require('dotenv').config();
 const mysql = require('mysql');
 const fs = require('fs');
 const path = require('path');
-const csv = require('fast-csv');
-const excelToJson = require('convert-excel-to-json');
 const cors = require('cors');
 const app = express();
 const multer = require('multer');
@@ -53,49 +51,44 @@ const upload = multer({
 
 app.post('/upload',  upload.single('file'), async (req, res) => {
    try{
-      const upload = multer({ dest: 'uploads/' });
-   // console.log({file: req.file})
-
-   // res.status(200).send({
-   //    statuscode: 200,
-   //    message: 'File uploaded successfully',
-   // })
-   }catch(err){
-      console.log(err)
-      res.status(404).json({error: err.message})
-   }
-
-   // const csvk= fs.readFileSync('./uploads/'+req.file.filename, 'utf-8')
-   // let array = (await csvk.writeToString()).split("\r")
-
-   // let result = []
-
-   // let headers = array[0].split(",")
-
-   // for(let i = 1; i < array.length-1; i++){
-   //    let obj = {}
-   //    let str = array[i].split(",")
-   //    let s = ''
-   // }
-   
-   
-   let json = csvToJson.getJsonFromCsv('./uploads/'+req.file.filename);
-   for(let i=0; i<json.length;i++){
-      // console.log("JSON FILE: " , json[i]);
-   }
-   const strJ =(JSON.stringify(json));
-   // console.log(strJ);
-   const query = await connection.query("INSERT INTO `json` (id, rawData, status) VALUES (1, '"+ strJ +"', FALSE)", (err,result) => {
-      if(err) {
-         res.status(404).send(err);
+      try{
+         const upload = multer({ dest: 'uploads/' });
+      }catch(err){
+         console.log(err)
+         res.status(404).json({error: err.message, message: 'Invalid file type! Upload csv file.'})
       }
-      else {
-         // console.log(query)
-         res.send(result != null ? 'Success' : 'fail')
-      }
-      });
+      const json = csvToJson.getJsonFromCsv('./uploads/'+req.file.filename);
+   // console.log ("Result:" ,json);
+      let array = json
+      const key = 'merchantId,terminalId,maskedPan,stan,rrn,currency,amount,transactionDate,responseCode,responseMessage'
+   
+      array.forEach((element) => {
+         const rrn  = element[key].split(",")[4]
+         const merchantId = element[key].split(",")[0]
+         const terminalId = element[key].split(",")[1]
+         const rawData = element[key].split(",")
+         // console.log("RRN: ", rrn )
+         // console.log ("MERCHANT ID ",merchantId, "TERMINAL ID", terminalId, "RAW DATA ",rawData)
+         
+         const query = `INSERT INTO transaction (merchantId, terminalId, rrn, rawData) VALUES ('${merchantId}', '${terminalId}', '${rrn}', '${rawData}')` 
 
-});
+         connection.query(query, (err, result) => {
+            if (err){
+               // console.log (err)
+               console.log ("Error in inserting into transaction table", err)
+            }
+         })
+      },
+      console.log("All records inserted successfully"),
+      res.send('All records sent successfully!')
+   )}
+   catch(err){
+      console.log(err);
+      res.status(500).send('Error inserting records!');
+   }
+})
+
+
 
 app.listen(3000, function(){
    console.log('Server listening on port 3000')
