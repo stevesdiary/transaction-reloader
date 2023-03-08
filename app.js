@@ -49,6 +49,10 @@ const upload = multer({
 })
 
 
+
+
+
+
 app.post('/upload',  upload.single('file'), async (req, res) => {
    try{
       try{
@@ -58,18 +62,17 @@ app.post('/upload',  upload.single('file'), async (req, res) => {
          res.status(404).json({error: err.message, message: 'Invalid file type! Upload csv file.'})
       }
       const json = csvToJson.getJsonFromCsv('./uploads/'+req.file.filename);
-   // console.log ("Result:" ,json);
+      // console.log ("Result:" ,json);
       let array = json
       const key = 'merchantId,terminalId,maskedPan,stan,rrn,currency,amount,transactionDate,responseCode,responseMessage'
-   
-      array.forEach((element) => {
+      
+      json.forEach((element) => {
          const rrn  = element[key].split(",")[4]
          const merchantId = element[key].split(",")[0]
          const terminalId = element[key].split(",")[1]
          const rawData = element[key].split(",")
          // console.log("RRN: ", rrn )
-         // console.log ("MERCHANT ID ",merchantId, "TERMINAL ID", terminalId, "RAW DATA ",rawData)
-         
+         // console.log ("Hello world")
          const query = `INSERT INTO transaction (merchantId, terminalId, rrn, rawData) VALUES ('${merchantId}', '${terminalId}', '${rrn}', '${rawData}')` 
 
          connection.query(query, (err, result) => {
@@ -78,16 +81,44 @@ app.post('/upload',  upload.single('file'), async (req, res) => {
                console.log ("Error in inserting into transaction table", err)
             }
          })
-      },
-      console.log("All records inserted successfully"),
-      res.send('All records sent successfully!')
-   )}
-   catch(err){
+         const status = 1
+         const send_data = `SELECT rawData FROM transaction WHERE rrn = '${rrn}'`
+         const send = connection.query(send_data)
+         const sql = `UPDATE transaction SET status = '${status}' WHERE rrn = '${rrn}'`
+         let data = [false, 1];
+         connection.query(send_data, (err, result) => {
+            if (err) {console.log(err)}
+            else{
+               console.log("RESULT: ",result)
+               res.status(200).send({
+                  statuscode: 200,
+                  message: 'File uploaded successfully!',
+                  result: result
+               })
+            }
+         })
+      
+      })
+   
+      
+   }catch(err){
       console.log(err);
-      res.status(500).send('Error inserting records!');
+      // res.status(500).send('Error inserting records!');
    }
+   
+
 })
 
+      
+app.post('/transactions', async (req, res) => {
+   // const transaction = req.body
+   const rrn = req.body.rrn
+      // connection.query = `SELECT * FROM transaction WHERE rrn = '${rrn}'`
+         {
+            console.log(err)
+         }   
+
+});
 
 
 app.listen(3000, function(){
