@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const app = express();
+const axios = require('axios');
 const multer = require('multer');
 const csvToObj = require('csv-to-js-parser').csvToObj;
 app.use(bodyParser.json())
@@ -34,6 +35,7 @@ const storage = multer.diskStorage({
    },
    filename: function (req, file, cb) {
       cb(null, Date.now() + path.extname(file.originalname));
+      // console.log (Date.now())
    }
 });
 const multerFilter = (req, file, cb) => {
@@ -55,6 +57,7 @@ const upload = multer({
 
 
 app.post('/upload',  upload.single('file'), async (req, res) => {
+   const file = req.body.file
    try{
       try{
          const upload = multer({ dest: 'uploads/' });
@@ -67,99 +70,59 @@ app.post('/upload',  upload.single('file'), async (req, res) => {
             message: 'File sent successfully!'
          })
       try{
-         CSVToJSON().fromFile('./user.csv').then(jsonArray =>{
-            console.log('user list = ',jsonArray)
+         CSVToJSON().fromFile('./uploads/'+req.file.filename).then(jsonArray =>{
+            // console.log('Json Array = ',jsonArray)
             let count =0;
             for(let item of jsonArray){
                let obj = {};
                obj.hash = null;
                obj.body = {
                   "accountType": "SAVINGS",
-                  "acquiringInstCode": "200018",
+                  "acquiringInstCode": "",
                   "amount": item.amount,
                   "authCode": "",
-                  "cardExpiry": "2502",
-                  "cardHolder": "AK/SAMSON",
-                  "cardLabel": "Master card",
+                  "cardExpiry": "",
+                  "cardHolder": "",
+                  "cardLabel": "",
                   "maskedPan": item.maskedPan,
                   "merchantId": item.merchantId,
-                  "originalForwardingInstCode": "627629",
+                  "originalForwardingInstCode": "",
                   "responseCode": item.responseCode,
                   "rrn": item.rrn,
                   "terminalId": item.terminalId,
-                  "transactionType": "PURCHASE",
+                  "transactionType": "",
                   "transmissionDateTime": item.transactionDate,
                   "responseMessage": item.responseMessage
                }
                console.log('obj '+count++,obj);
-            }
-         })
-      }catch(err){
-         console.log(err)
-      }
-   
-         const json = csvToJson.getJsonFromCsv('./uploads/'+req.file.filename);
-        // console.log ("Result:" ,json);
-        // return;
-
-        // for(item of)
-
-         const key = Object.keys(json[0])
-         // const key = 'merchantId,terminalId,maskedPan,stan,rrn,currency,amount,transactionDate,responseCode,responseMessage'
-         
-         json.forEach((element) => {
-            const rrn  = element[key].split(",")[4]
-            const merchantId = element[key].split(",")[0]
-            const terminalId = element[key].split(",")[1]
-            const rawData = element[key].split(",")
-            
-            const query = `INSERT INTO transaction (merchantId, terminalId, rrn, rawData) VALUES ('${merchantId}', '${terminalId}', '${rrn}', '${rawData}')` 
-
-            connection.query(query, (err, result) => {
+               
+               const json = csvToJson.getJsonFromCsv('./uploads/'+req.file.filename);
+               const key = Object.keys(json[0])
+               json.forEach((element) => {
+               const rawData = element[key].split(",")
+               // console.log(rawData)
+               const query = `INSERT INTO transaction (merchantId, terminalId, rrn, rawData) VALUES ('${item.merchantId}', '${item.terminalId}', '${item.rrn}', '${rawData}')` 
+               connection.query(query, (err, result) => {
                if (err){
                   console.log ("Error in inserting into transaction table", err)
                }
+            
             })
-            const status = 1
-            const send_data = `SELECT rawData FROM transaction WHERE rrn = '${rrn}'`
-            const send = connection.query(send_data)
-            const sql = `UPDATE transaction SET status = '${status}' WHERE rrn = '${rrn}'`
-            let data = [false, 1];
-            connection.query(send_data, (err, result) => {
-               if (err) {console.log(err)}
-               else{
-                  // console.log("RESULT: ", key, "RRDDD: ",rawData)
-                  // arrayOfStrings= (key[0].split(","));
-            }
+            axios({
+               method: 'post',
+               url: 'https://fawaya.aellapp.com/merchant',
+               data: {
+                  obj
+               }
+            });
+            })
 
-            
+         }
+         })
+   }catch(err){
+      console.log(err)
+   }
 
-
-            
-            // let keys = ['merchantId','terminalId','maskedPan','stan','rrn','currency','amount','transactionDate','responseCode','responseMessage'];
-            // json.split
-            // let answer = keys.split(",")
-            // console.log("Answer: ",answer)
-            // let mainArray = [];
-            // for (let value of keys) {
-            //    let obj = {};
-            //    obj.merchantId = "";
-            //    obj.id = "";
-            //    mainArray.push(obj);
-            //    console.log("Answer: ",)
-            // }
-            // key.forEach(k => {
-            //    rawData.forEach(i => {
-                  // console.log(i,k)
-               // })
-            // })
-         });
-
-
-
-
-
-      })
    }catch(err){
       console.log(err);
    }
