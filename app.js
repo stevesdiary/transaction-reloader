@@ -9,6 +9,7 @@ const path = require('path');
 const cors = require('cors');
 const app = express();
 const multer = require('multer');
+const csvToObj = require('csv-to-js-parser').csvToObj;
 app.use(bodyParser.json())
 app.use(express.urlencoded({ extended: true }))
 app.use(express.static('public'));
@@ -36,7 +37,7 @@ const storage = multer.diskStorage({
    }
 });
 const multerFilter = (req, file, cb) => {
-   if (file.mimetype === 'text/csv') {
+   if (file.mimetype === 'user.csv') {
       cb(null, true);
    }else{
       cb(new Error('Invalid file type! Upload csv file.'), false);
@@ -61,63 +62,128 @@ app.post('/upload',  upload.single('file'), async (req, res) => {
          console.log(err)
          res.status(404).json({error: err.message, message: 'Invalid file type! Upload csv file.'})
       }
-      const json = csvToJson.getJsonFromCsv('./uploads/'+req.file.filename);
-      // console.log ("Result:" ,json);
-      let array = json
-      const key = 'merchantId,terminalId,maskedPan,stan,rrn,currency,amount,transactionDate,responseCode,responseMessage'
-      
-      json.forEach((element) => {
-         const rrn  = element[key].split(",")[4]
-         const merchantId = element[key].split(",")[0]
-         const terminalId = element[key].split(",")[1]
-         const rawData = element[key].split(",")
-         // console.log("RRN: ", rrn )
-         // console.log ("Hello world")
-         const query = `INSERT INTO transaction (merchantId, terminalId, rrn, rawData) VALUES ('${merchantId}', '${terminalId}', '${rrn}', '${rawData}')` 
-
-         connection.query(query, (err, result) => {
-            if (err){
-               // console.log (err)
-               console.log ("Error in inserting into transaction table", err)
+         res.status(200).send({
+            statuscode: 200,
+            message: 'File sent successfully!'
+         })
+      try{
+         CSVToJSON().fromFile('./user.csv').then(jsonArray =>{
+            console.log('user list = ',jsonArray)
+            let count =0;
+            for(let item of jsonArray){
+               let obj = {};
+               obj.hash = null;
+               obj.body = {
+                  "accountType": "SAVINGS",
+                  "acquiringInstCode": "200018",
+                  "amount": item.amount,
+                  "authCode": "",
+                  "cardExpiry": "2502",
+                  "cardHolder": "AK/SAMSON",
+                  "cardLabel": "Master card",
+                  "maskedPan": item.maskedPan,
+                  "merchantId": item.merchantId,
+                  "originalForwardingInstCode": "627629",
+                  "responseCode": item.responseCode,
+                  "rrn": item.rrn,
+                  "terminalId": item.terminalId,
+                  "transactionType": "PURCHASE",
+                  "transmissionDateTime": item.transactionDate,
+                  "responseMessage": item.responseMessage
+               }
+               console.log('obj '+count++,obj);
             }
          })
-         const status = 1
-         const send_data = `SELECT rawData FROM transaction WHERE rrn = '${rrn}'`
-         const send = connection.query(send_data)
-         const sql = `UPDATE transaction SET status = '${status}' WHERE rrn = '${rrn}'`
-         let data = [false, 1];
-         connection.query(send_data, (err, result) => {
-            if (err) {console.log(err)}
-            else{
-               console.log("RESULT: ",result)
-               res.status(200).send({
-                  statuscode: 200,
-                  message: 'File uploaded successfully!',
-                  result: result
-               })
-            }
-         })
-      
-      })
+      }catch(err){
+         console.log(err)
+      }
    
-      
+         const json = csvToJson.getJsonFromCsv('./uploads/'+req.file.filename);
+        // console.log ("Result:" ,json);
+        // return;
+
+        // for(item of)
+
+         const key = Object.keys(json[0])
+         // const key = 'merchantId,terminalId,maskedPan,stan,rrn,currency,amount,transactionDate,responseCode,responseMessage'
+         
+         json.forEach((element) => {
+            const rrn  = element[key].split(",")[4]
+            const merchantId = element[key].split(",")[0]
+            const terminalId = element[key].split(",")[1]
+            const rawData = element[key].split(",")
+            
+            const query = `INSERT INTO transaction (merchantId, terminalId, rrn, rawData) VALUES ('${merchantId}', '${terminalId}', '${rrn}', '${rawData}')` 
+
+            connection.query(query, (err, result) => {
+               if (err){
+                  console.log ("Error in inserting into transaction table", err)
+               }
+            })
+            const status = 1
+            const send_data = `SELECT rawData FROM transaction WHERE rrn = '${rrn}'`
+            const send = connection.query(send_data)
+            const sql = `UPDATE transaction SET status = '${status}' WHERE rrn = '${rrn}'`
+            let data = [false, 1];
+            connection.query(send_data, (err, result) => {
+               if (err) {console.log(err)}
+               else{
+                  // console.log("RESULT: ", key, "RRDDD: ",rawData)
+                  // arrayOfStrings= (key[0].split(","));
+            }
+
+            
+
+
+            
+            // let keys = ['merchantId','terminalId','maskedPan','stan','rrn','currency','amount','transactionDate','responseCode','responseMessage'];
+            // json.split
+            // let answer = keys.split(",")
+            // console.log("Answer: ",answer)
+            // let mainArray = [];
+            // for (let value of keys) {
+            //    let obj = {};
+            //    obj.merchantId = "";
+            //    obj.id = "";
+            //    mainArray.push(obj);
+            //    console.log("Answer: ",)
+            // }
+            // key.forEach(k => {
+            //    rawData.forEach(i => {
+                  // console.log(i,k)
+               // })
+            // })
+         });
+
+
+
+
+
+      })
    }catch(err){
       console.log(err);
-      // res.status(500).send('Error inserting records!');
    }
+});
+
+   //To delete processed files in uploads folder
+
+app.post('/delete', async (req, res) => {
+   const filePath = './uploads/fileName.txt';
+
+   // Check if the file exists
+   if (fs.existsSync(filePath)) {
+     // Delete the file
+      fs.unlink(filePath, (err) => {
+         if (err) {
+         console.error(err);
+         return;
+         }
    
-
-})
-
-      
-app.post('/transactions', async (req, res) => {
-   // const transaction = req.body
-   const rrn = req.body.rrn
-      // connection.query = `SELECT * FROM transaction WHERE rrn = '${rrn}'`
-         {
-            console.log(err)
-         }   
-
+         console.log('File deleted successfully');
+      });
+   } else {
+      console.error('File not found');
+   }
 });
 
 
