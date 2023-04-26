@@ -51,11 +51,6 @@ const upload = multer({
    filefilter: multerFilter
 })
 
-
-
-
-
-
 app.post('/upload',  upload.single('file'), async (req, res) => {
    const file = req.body.file
    try{
