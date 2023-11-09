@@ -105,7 +105,7 @@ app.post('/upload',  upload.single('file'), async (req, res) => {
             })
             axios({
                method: 'post',
-               url: 'https://fawaya.aellapp.com/merchant',
+               url: process.env.ENDPOINT_URL,
                data: {
                   obj
                }
